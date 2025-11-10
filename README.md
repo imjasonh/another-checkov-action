@@ -1,4 +1,6 @@
-# Checkov GitHub Action
+# Another Checkov GitHub Action
+
+[![Example](https://github.com/imjasonh/another-checkov-action/actions/workflows/use-action.yml/badge.svg)](https://github.com/imjasonh/another-checkov-action/actions/workflows/use-action.yml)
 
 Run [Checkov](https://www.checkov.io/) security scans on your infrastructure code and get results as GitHub workflow summaries with inline annotations.
 
