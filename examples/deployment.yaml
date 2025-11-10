@@ -1,0 +1,54 @@
+# Misconfigured Kubernetes Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insecure-app
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insecure-app
+  template:
+    metadata:
+      labels:
+        app: insecure-app
+    spec:
+      # No security context defined
+      containers:
+      - name: app
+        image: nginx:latest  # Using latest tag
+        ports:
+        - containerPort: 80
+
+        # Running as root (no securityContext)
+        # No resource limits
+        # No liveness/readiness probes
+
+        env:
+        - name: SECRET_KEY
+          value: "hardcoded-secret-value"  # Hardcoded secret
+
+        # Privileged container
+        securityContext:
+          privileged: true
+          allowPrivilegeEscalation: true
+          runAsNonRoot: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            add:
+              - SYS_ADMIN
+              - NET_ADMIN
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insecure-service
+spec:
+  type: LoadBalancer  # Exposing to the internet
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: insecure-app

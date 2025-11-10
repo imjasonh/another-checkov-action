@@ -1,0 +1,27 @@
+name: Checkov Security Scan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.tf'
+      - '**.yaml'
+      - '**.yml'
+      - '**/Dockerfile'
+
+permissions: {}
+
+jobs:
+  checkov-strict:
+    runs-on: ubuntu-latest
+    name: Checkov Security Scan
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Need full history for git diff
+
+      - uses: ./

@@ -1,0 +1,7 @@
+---
+# Checkov configuration file
+# See https://www.checkov.io/2.Basics/Suppressing%20and%20Skipping%20Policies.html
+
+# Skip specific checks globally
+skip-check:
+  - CKV_AWS_126  # Ensure that detailed monitoring is enabled for EC2 instances
