@@ -3,9 +3,18 @@ const core = require('@actions/core');
 /**
  * Generate GitHub Actions summary from Checkov results
  * @param {Object} results - Parsed Checkov results
+ * @param {Object} context - GitHub context (optional, for file links)
  */
-async function generateSummary(results) {
+async function generateSummary(results, context = null) {
   const { summary, results: allResults } = results;
+
+  // Build base URL for file links
+  let fileUrlBase = null;
+  if (context && context.payload.repository) {
+    const { owner, repo } = context.repo;
+    const sha = context.sha;
+    fileUrlBase = `https://github.com/${owner.login || owner}/${repo}/blob/${sha}`;
+  }
 
   let markdown = '# Checkov Security Scan Results\n\n';
 
@@ -27,9 +36,9 @@ async function generateSummary(results) {
   // Failed checks details
   const failedChecks = allResults.filter(r => r.checkType === 'failed');
   if (failedChecks.length > 0) {
-    markdown += '## Failed Checks by Type\n\n';
+    markdown += '## Failed Checks\n\n';
 
-    // Group by check ID and count occurrences
+    // Group by check ID and count occurrences, sorted by most common first
     const groupedByCheckId = groupBy(failedChecks, 'checkId');
     const checkCounts = Object.entries(groupedByCheckId)
       .map(([checkId, checks]) => ({
@@ -40,28 +49,34 @@ async function generateSummary(results) {
       }))
       .sort((a, b) => b.count - a.count);
 
-    // Show summary table
-    markdown += '| Check | Count |\n';
-    markdown += '|-------|-------|\n';
-    for (const { checkId, checkName, count } of checkCounts) {
-      markdown += `| ${checkName} (${checkId}) | ${count} |\n`;
-    }
-    markdown += '\n';
-
-    // Show details for each check type
-    markdown += '## Failed Check Details\n\n';
+    // Show details for each check type (most common first)
     for (const { checkId, checkName, checks } of checkCounts) {
-      markdown += `### ${checkName} (${checkId})\n\n`;
+      markdown += `### ${checkName} (${checkId}) - ${checks.length} instance${checks.length > 1 ? 's' : ''}\n\n`;
 
       if (checks[0].guideline) {
         markdown += `[View Guideline](${checks[0].guideline})\n\n`;
       }
 
       for (const check of checks.slice(0, 10)) { // Limit to 10 per check type
-        const lineInfo = check.line.length > 0
-          ? `:${check.line[0]}-${check.line[1]}`
-          : '';
-        const fileLink = check.file ? `[\`${check.file}${lineInfo}\`](${check.file})` : 'Unknown file';
+        let fileLink;
+        if (check.file) {
+          const lineInfo = check.line.length > 0
+            ? `:${check.line[0]}-${check.line[1]}`
+            : '';
+
+          if (fileUrlBase && check.line.length > 0) {
+            // Create GitHub URL with line numbers
+            const lineFragment = check.line.length > 1
+              ? `#L${check.line[0]}-L${check.line[1]}`
+              : `#L${check.line[0]}`;
+            const url = `${fileUrlBase}/${check.file}${lineFragment}`;
+            fileLink = `[\`${check.file}${lineInfo}\`](${url})`;
+          } else {
+            fileLink = `\`${check.file}${lineInfo}\``;
+          }
+        } else {
+          fileLink = 'Unknown file';
+        }
 
         markdown += `- ${fileLink}`;
         if (check.resource) {

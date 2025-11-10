@@ -37,7 +37,7 @@ async function run() {
 
     if (results) {
       // Generate summary
-      await generateSummary(results);
+      await generateSummary(results, github.context);
 
       // Add annotations for PR context
       if (github.context.eventName === 'pull_request') {
