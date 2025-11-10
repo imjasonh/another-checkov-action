@@ -10,31 +10,17 @@ const { addAnnotations } = require('./annotations');
 async function run() {
   try {
     // Get inputs
-    const directory = core.getInput('directory') || '.';
-    const framework = core.getInput('framework') || 'all';
     const failOnError = core.getInput('fail-on-error') !== 'false';
     const checkovVersion = core.getInput('checkov-version') || 'latest';
-    let configFile = core.getInput('config-file') || '';
-
-    // Check for default config file if not specified
-    if (!configFile) {
-      const defaultConfigs = ['.checkov.yaml', '.checkov.yml'];
-      for (const defaultConfig of defaultConfigs) {
-        if (fs.existsSync(defaultConfig)) {
-          configFile = defaultConfig;
-          core.info(`Using config file: ${configFile}`);
-          break;
-        }
-      }
-    }
+    const checkovFlags = core.getInput('checkov-flags') || '';
 
     core.info('Installing Checkov...');
     await installCheckov(checkovVersion);
 
-    core.info(`Running Checkov scan on directory: ${directory}`);
+    core.info('Running Checkov scan...');
     const outputFile = path.join(process.env.RUNNER_TEMP || '/tmp', 'checkov-results.json');
 
-    const exitCode = await runCheckov(directory, framework, outputFile, configFile);
+    const exitCode = await runCheckov(outputFile, checkovFlags);
 
     // Read and parse results
     let results = null;
@@ -56,15 +42,22 @@ async function run() {
       if (github.context.eventName === 'pull_request') {
         await addAnnotations(results, github.context);
       }
-    }
 
-    // Handle failure
-    if (exitCode !== 0 && failOnError) {
-      core.setFailed(`Checkov found security issues (exit code: ${exitCode})`);
+      // Handle failure based on results (not exit code, since we use --soft-fail)
+      if (results.summary.failed > 0 && failOnError) {
+        core.setFailed(`Checkov found ${results.summary.failed} security issue${results.summary.failed > 1 ? 's' : ''}`);
+      } else if (results.summary.failed > 0) {
+        core.warning(`Checkov found ${results.summary.failed} security issue${results.summary.failed > 1 ? 's' : ''} but fail-on-error is disabled`);
+      } else {
+        core.info('Checkov scan completed successfully with no issues');
+      }
     } else if (exitCode !== 0) {
-      core.warning(`Checkov found security issues but fail-on-error is disabled`);
-    } else {
-      core.info('Checkov scan completed successfully with no issues');
+      // Fallback if we couldn't parse results
+      if (failOnError) {
+        core.setFailed(`Checkov exited with code ${exitCode}`);
+      } else {
+        core.warning(`Checkov exited with code ${exitCode} but fail-on-error is disabled`);
+      }
     }
 
   } catch (error) {
@@ -80,20 +73,47 @@ async function installCheckov(version) {
   await exec.exec(pipCommand[0], pipCommand.slice(1));
 }
 
-async function runCheckov(directory, framework, outputFile, configFile) {
+async function runCheckov(outputFile, checkovFlags) {
+  let userFlags = [];
+
+  // Parse user flags if provided
+  if (checkovFlags) {
+    userFlags = checkovFlags.trim().split(/\s+/).filter(f => f);
+
+    // Check if user specified --output and warn/remove it
+    const outputIndex = userFlags.findIndex(f => f === '--output' || f === '-o');
+    if (outputIndex !== -1) {
+      core.warning('Overriding --output flag (must be JSON for parsing)');
+      userFlags.splice(outputIndex, 2); // Remove --output and its value
+    }
+
+    // Check if user specified --soft-fail and remove it (we manage this)
+    const softFailIndex = userFlags.findIndex(f => f === '--soft-fail');
+    if (softFailIndex !== -1) {
+      core.info('Removing redundant --soft-fail flag (already set by action)');
+      userFlags.splice(softFailIndex, 1);
+    }
+
+    if (userFlags.length > 0) {
+      core.info(`Using checkov flags: ${userFlags.join(' ')}`);
+    }
+  }
+
+  // Add --directory . if not already specified
+  const hasDirectory = userFlags.some(f => f.startsWith('--directory') || f === '-d');
+  const hasFile = userFlags.some(f => f.startsWith('--file') || f === '-f');
+
   const args = [
-    '--directory', directory,
     '--output', 'json',
-    '--soft-fail'  // Always use soft-fail to capture results; we'll handle failure in the action
+    '--soft-fail',  // Always use soft-fail to capture results; we'll handle failure in the action
   ];
 
-  if (framework !== 'all') {
-    args.push('--framework', framework);
+  // Default to current directory if neither --directory nor --file specified
+  if (!hasDirectory && !hasFile) {
+    args.push('--directory', '.');
   }
 
-  if (configFile) {
-    args.push('--config-file', configFile);
-  }
+  args.push(...userFlags);
 
   let exitCode = 0;
   let outputData = '';

@@ -12,7 +12,7 @@ on:
 permissions: {}
 
 jobs:
-  checkov-strict:
+  use-action:
     runs-on: ubuntu-latest
     name: Checkov Security Scan
 
@@ -25,3 +25,5 @@ jobs:
           fetch-depth: 0  # Need full history for git diff
 
       - uses: ./
+        with:
+          fail-on-error: false

@@ -59,7 +59,7 @@ async function addAnnotations(results, context) {
         }
       }
 
-      // Check if this file was changed in the PR
+      // Only annotate files that were changed in the PR
       if (matchedPath) {
         const properties = {
           title: `${check.checkId}: ${check.checkName}`,
@@ -79,8 +79,6 @@ async function addAnnotations(results, context) {
         // Create error annotations for all failed checks
         core.error(message, properties);
         annotationCount++;
-      } else {
-        core.warning(`No match for file: ${check.file} (tried variations but none matched changed files)`);
       }
     }
 
