@@ -42,15 +42,22 @@ async function run() {
       if (github.context.eventName === 'pull_request') {
         await addAnnotations(results, github.context);
       }
-    }
 
-    // Handle failure
-    if (exitCode !== 0 && failOnError) {
-      core.setFailed(`Checkov found security issues (exit code: ${exitCode})`);
+      // Handle failure based on results (not exit code, since we use --soft-fail)
+      if (results.summary.failed > 0 && failOnError) {
+        core.setFailed(`Checkov found ${results.summary.failed} security issue${results.summary.failed > 1 ? 's' : ''}`);
+      } else if (results.summary.failed > 0) {
+        core.warning(`Checkov found ${results.summary.failed} security issue${results.summary.failed > 1 ? 's' : ''} but fail-on-error is disabled`);
+      } else {
+        core.info('Checkov scan completed successfully with no issues');
+      }
     } else if (exitCode !== 0) {
-      core.warning(`Checkov found security issues but fail-on-error is disabled`);
-    } else {
-      core.info('Checkov scan completed successfully with no issues');
+      // Fallback if we couldn't parse results
+      if (failOnError) {
+        core.setFailed(`Checkov exited with code ${exitCode}`);
+      } else {
+        core.warning(`Checkov exited with code ${exitCode} but fail-on-error is disabled`);
+      }
     }
 
   } catch (error) {
