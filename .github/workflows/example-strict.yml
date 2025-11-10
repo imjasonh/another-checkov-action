@@ -1,0 +1,38 @@
+name: Checkov Strict Mode (Example)
+
+# This workflow demonstrates stricter security scanning
+# Uncomment and modify as needed for production use
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.tf'
+      - '**.yaml'
+      - '**.yml'
+      - 'Dockerfile'
+      - '**.json'
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  checkov-strict:
+    runs-on: ubuntu-latest
+    name: Strict Security Scan
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov (Strict Mode)
+        uses: ./
+        with:
+          directory: '.'
+          framework: 'all'  # Scan all supported frameworks
+          soft-fail: 'false'  # Fail on security issues
+          checkov-version: 'latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

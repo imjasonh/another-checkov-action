@@ -1,0 +1,36 @@
+name: 'Checkov Security Scan'
+description: 'Run Checkov security scanner and generate reports'
+author: 'Jason'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  directory:
+    description: 'Directory to scan (default: current directory)'
+    required: false
+    default: '.'
+  framework:
+    description: 'Filter scan to specific frameworks (e.g., terraform, kubernetes, dockerfile)'
+    required: false
+    default: 'all'
+  soft-fail:
+    description: 'Do not fail the action even if checks fail'
+    required: false
+    default: 'false'
+  checkov-version:
+    description: 'Version of checkov to install (default: latest)'
+    required: false
+    default: 'latest'
+  output-format:
+    description: 'Output format for checkov (default: json)'
+    required: false
+    default: 'json'
+
+outputs:
+  results:
+    description: 'JSON string of the scan results'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
