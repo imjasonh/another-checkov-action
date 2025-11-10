@@ -14,10 +14,10 @@ inputs:
     description: 'Filter scan to specific frameworks (e.g., terraform, kubernetes, dockerfile)'
     required: false
     default: 'all'
-  soft-fail:
-    description: 'Do not fail the action even if checks fail'
+  fail-on-error:
+    description: 'Fail the action if security issues are found'
     required: false
-    default: 'false'
+    default: 'true'
   checkov-version:
     description: 'Version of checkov to install (default: latest)'
     required: false

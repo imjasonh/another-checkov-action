@@ -12,7 +12,7 @@ async function run() {
     // Get inputs
     const directory = core.getInput('directory') || '.';
     const framework = core.getInput('framework') || 'all';
-    const softFail = core.getInput('soft-fail') === 'true';
+    const failOnError = core.getInput('fail-on-error') !== 'false';
     const checkovVersion = core.getInput('checkov-version') || 'latest';
     let configFile = core.getInput('config-file') || '';
 
@@ -59,10 +59,10 @@ async function run() {
     }
 
     // Handle failure
-    if (exitCode !== 0 && !softFail) {
+    if (exitCode !== 0 && failOnError) {
       core.setFailed(`Checkov found security issues (exit code: ${exitCode})`);
     } else if (exitCode !== 0) {
-      core.warning(`Checkov found security issues but soft-fail is enabled`);
+      core.warning(`Checkov found security issues but fail-on-error is disabled`);
     } else {
       core.info('Checkov scan completed successfully with no issues');
     }
