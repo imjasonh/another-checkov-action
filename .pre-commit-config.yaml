@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: npm-build
+        name: Build distribution bundle
+        entry: npm run build
+        language: system
+        pass_filenames: false
+        files: ^src/.*\.js$
