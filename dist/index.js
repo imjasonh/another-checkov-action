@@ -29926,7 +29926,6 @@ function wrappy (fn, cb) {
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const core = __nccwpck_require__(7484);
-const github = __nccwpck_require__(3228);
 const exec = __nccwpck_require__(5236);
 
 /**
@@ -29935,10 +29934,15 @@ const exec = __nccwpck_require__(5236);
  * @param {Object} context - GitHub context
  */
 async function addAnnotations(results, context) {
+  core.info('Starting annotation process...');
+
   try {
     const failedChecks = results.results.filter(r => r.checkType === 'failed');
 
+    core.info(`Found ${failedChecks.length} failed checks`);
+
     if (failedChecks.length === 0) {
+      core.info('No failed checks to annotate');
       return;
     }
 
@@ -29946,15 +29950,21 @@ async function addAnnotations(results, context) {
     const changedFiles = await getChangedFiles(context);
 
     core.info(`Found ${changedFiles.size} changed files`);
-    core.info(`Found ${failedChecks.length} failed checks`);
 
     // Log unique file paths from checks for debugging
     const checkFiles = new Set(failedChecks.map(c => c.file).filter(f => f));
     core.info(`Files with issues: ${Array.from(checkFiles).join(', ')}`);
 
     // Add annotations for checks that affect changed files
+    // Note: GitHub Actions limits us to 10 annotations per workflow run
     let annotationCount = 0;
+    const maxAnnotations = 10;
+
     for (const check of failedChecks) {
+      if (annotationCount >= maxAnnotations) {
+        core.warning(`Reached GitHub Actions annotation limit (${maxAnnotations}). Remaining ${failedChecks.length - annotationCount} issues are visible in the summary.`);
+        break;
+      }
       if (!check.file) {
         continue;
       }
@@ -30017,22 +30027,39 @@ async function getChangedFiles(context) {
 
   try {
     if (!context.payload.pull_request) {
+      core.info('Not a pull request, skipping file change detection');
       return changedFiles;
     }
 
-    const baseSha = context.payload.pull_request.base.sha;
-    const headSha = context.payload.pull_request.head.sha;
+    // Use git diff against the base branch instead of SHAs
+    const baseBranch = context.payload.pull_request.base.ref;
+    core.info(`Detecting changed files against base branch: ${baseBranch}`);
 
-    // Use git diff to get changed files
     let output = '';
+    let exitCode = 0;
 
-    await exec.exec('git', ['diff', '--name-only', `${baseSha}...${headSha}`], {
-      listeners: {
-        stdout: (data) => {
-          output += data.toString();
+    try {
+      exitCode = await exec.exec('git', ['diff', '--name-only', `origin/${baseBranch}...HEAD`], {
+        ignoreReturnCode: true,
+        listeners: {
+          stdout: (data) => {
+            output += data.toString();
+          },
+          stderr: (data) => {
+            core.debug(`git diff stderr: ${data.toString()}`);
+          }
         }
-      }
-    });
+      });
+    } catch (err) {
+      core.warning(`git diff command failed: ${err.message}`);
+      return changedFiles;
+    }
+
+    if (exitCode !== 0) {
+      core.warning(`git diff exited with code ${exitCode}, trying alternative method`);
+      // Fallback: just annotate everything
+      return changedFiles;
+    }
 
     const files = output.split('\n').filter(f => f.trim());
     for (const file of files) {
@@ -30040,7 +30067,9 @@ async function getChangedFiles(context) {
     }
 
     if (changedFiles.size > 0) {
-      core.info(`Changed files: ${Array.from(changedFiles).join(', ')}`);
+      core.info(`Changed files: ${Array.from(changedFiles).slice(0, 10).join(', ')}${changedFiles.size > 10 ? ` ... and ${changedFiles.size - 10} more` : ''}`);
+    } else {
+      core.warning('No changed files detected - annotations may not appear');
     }
   } catch (error) {
     core.warning(`Failed to get changed files: ${error.message}`);

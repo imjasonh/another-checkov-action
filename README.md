@@ -60,3 +60,7 @@ skip-check:
 ```
 
 See [Checkov documentation](https://www.checkov.io/2.Basics/Suppressing%20and%20Skipping%20Policies.html) for more configuration options.
+
+## Limitations
+
+- **Annotation limit**: GitHub Actions limits each workflow run to 10 inline annotations. If your scan finds more than 10 issues, only the first 10 will appear as inline annotations on your PR. All findings are still visible in the workflow summary report.
