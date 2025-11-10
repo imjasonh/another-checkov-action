@@ -22,6 +22,10 @@ inputs:
     description: 'Version of checkov to install (default: latest)'
     required: false
     default: 'latest'
+  config-file:
+    description: 'Path to Checkov config file (default: .checkov.yaml if it exists)'
+    required: false
+    default: ''
   output-format:
     description: 'Output format for checkov (default: json)'
     required: false

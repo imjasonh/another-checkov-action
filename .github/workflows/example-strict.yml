@@ -1,21 +1,20 @@
 name: Checkov Security Scan
 
-# This workflow demonstrates stricter security scanning
-# Uncomment and modify as needed for production use
-
 on:
   pull_request:
     branches: [main]
     paths:
       - '**.tf'
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   checkov-strict:
     runs-on: ubuntu-latest
     name: Checkov Security Scan
+
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4

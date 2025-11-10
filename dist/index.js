@@ -30160,11 +30160,11 @@ async function generateSummary(results, context = null) {
 
     // Show details for each check type (most common first)
     for (const { checkId, checkName, checks } of checkCounts) {
-      markdown += `### ${checkName} (${checkId}) - ${checks.length} instance${checks.length > 1 ? 's' : ''}\n\n`;
+      const checkIdDisplay = checks[0].guideline
+        ? `[${checkId}](${checks[0].guideline})`
+        : checkId;
 
-      if (checks[0].guideline) {
-        markdown += `[View Guideline](${checks[0].guideline})\n\n`;
-      }
+      markdown += `### ${checkName} (${checkIdDisplay})\n\n`;
 
       for (const check of checks.slice(0, 10)) { // Limit to 10 per check type
         let fileLink;
@@ -32151,6 +32151,19 @@ async function run() {
     const framework = core.getInput('framework') || 'all';
     const softFail = core.getInput('soft-fail') === 'true';
     const checkovVersion = core.getInput('checkov-version') || 'latest';
+    let configFile = core.getInput('config-file') || '';
+
+    // Check for default config file if not specified
+    if (!configFile) {
+      const defaultConfigs = ['.checkov.yaml', '.checkov.yml'];
+      for (const defaultConfig of defaultConfigs) {
+        if (fs.existsSync(defaultConfig)) {
+          configFile = defaultConfig;
+          core.info(`Using config file: ${configFile}`);
+          break;
+        }
+      }
+    }
 
     core.info('Installing Checkov...');
     await installCheckov(checkovVersion);
@@ -32158,7 +32171,7 @@ async function run() {
     core.info(`Running Checkov scan on directory: ${directory}`);
     const outputFile = path.join(process.env.RUNNER_TEMP || '/tmp', 'checkov-results.json');
 
-    const exitCode = await runCheckov(directory, framework, outputFile);
+    const exitCode = await runCheckov(directory, framework, outputFile, configFile);
 
     // Read and parse results
     let results = null;
@@ -32204,7 +32217,7 @@ async function installCheckov(version) {
   await exec.exec(pipCommand[0], pipCommand.slice(1));
 }
 
-async function runCheckov(directory, framework, outputFile) {
+async function runCheckov(directory, framework, outputFile, configFile) {
   const args = [
     '--directory', directory,
     '--output', 'json',
@@ -32213,6 +32226,10 @@ async function runCheckov(directory, framework, outputFile) {
 
   if (framework !== 'all') {
     args.push('--framework', framework);
+  }
+
+  if (configFile) {
+    args.push('--config-file', configFile);
   }
 
   let exitCode = 0;

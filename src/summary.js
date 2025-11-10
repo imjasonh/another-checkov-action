@@ -51,11 +51,11 @@ async function generateSummary(results, context = null) {
 
     // Show details for each check type (most common first)
     for (const { checkId, checkName, checks } of checkCounts) {
-      markdown += `### ${checkName} (${checkId}) - ${checks.length} instance${checks.length > 1 ? 's' : ''}\n\n`;
+      const checkIdDisplay = checks[0].guideline
+        ? `[${checkId}](${checks[0].guideline})`
+        : checkId;
 
-      if (checks[0].guideline) {
-        markdown += `[View Guideline](${checks[0].guideline})\n\n`;
-      }
+      markdown += `### ${checkName} (${checkIdDisplay})\n\n`;
 
       for (const check of checks.slice(0, 10)) { // Limit to 10 per check type
         let fileLink;
