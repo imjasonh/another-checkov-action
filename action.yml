@@ -1,6 +1,6 @@
 name: 'Checkov Security Scan'
 description: 'Run Checkov security scanner and generate reports'
-author: 'Jason'
+author: '@imjasonh'
 branding:
   icon: 'shield'
   color: 'blue'

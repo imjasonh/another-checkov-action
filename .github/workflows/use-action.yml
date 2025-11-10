@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - '**.tf'
+      - '**.yaml'
+      - '**.yml'
+      - '**/Dockerfile'
 
 permissions: {}
 
