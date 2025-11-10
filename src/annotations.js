@@ -1,5 +1,6 @@
 const core = require('@actions/core');
 const github = require('@actions/github');
+const exec = require('@actions/exec');
 
 /**
  * Add annotations for failed checks on PR diff lines
@@ -67,25 +68,23 @@ async function getChangedFiles(context) {
       return changedFiles;
     }
 
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) {
-      core.warning('GITHUB_TOKEN not available, skipping PR diff analysis');
-      return changedFiles;
-    }
+    const baseSha = context.payload.pull_request.base.sha;
+    const headSha = context.payload.pull_request.head.sha;
 
-    const octokit = github.getOctokit(token);
-    const { owner, repo } = context.repo;
-    const prNumber = context.payload.pull_request.number;
+    // Use git diff to get changed files
+    let output = '';
 
-    // Get PR files
-    const { data: files } = await octokit.rest.pulls.listFiles({
-      owner,
-      repo,
-      pull_number: prNumber
+    await exec.exec('git', ['diff', '--name-only', `${baseSha}...${headSha}`], {
+      listeners: {
+        stdout: (data) => {
+          output += data.toString();
+        }
+      }
     });
 
+    const files = output.split('\n').filter(f => f.trim());
     for (const file of files) {
-      changedFiles.add(file.filename);
+      changedFiles.add(file);
     }
   } catch (error) {
     core.warning(`Failed to get changed files: ${error.message}`);

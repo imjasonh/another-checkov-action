@@ -29927,6 +29927,7 @@ function wrappy (fn, cb) {
 
 const core = __nccwpck_require__(7484);
 const github = __nccwpck_require__(3228);
+const exec = __nccwpck_require__(5236);
 
 /**
  * Add annotations for failed checks on PR diff lines
@@ -29994,25 +29995,23 @@ async function getChangedFiles(context) {
       return changedFiles;
     }
 
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) {
-      core.warning('GITHUB_TOKEN not available, skipping PR diff analysis');
-      return changedFiles;
-    }
+    const baseSha = context.payload.pull_request.base.sha;
+    const headSha = context.payload.pull_request.head.sha;
 
-    const octokit = github.getOctokit(token);
-    const { owner, repo } = context.repo;
-    const prNumber = context.payload.pull_request.number;
+    // Use git diff to get changed files
+    let output = '';
 
-    // Get PR files
-    const { data: files } = await octokit.rest.pulls.listFiles({
-      owner,
-      repo,
-      pull_number: prNumber
+    await exec.exec('git', ['diff', '--name-only', `${baseSha}...${headSha}`], {
+      listeners: {
+        stdout: (data) => {
+          output += data.toString();
+        }
+      }
     });
 
+    const files = output.split('\n').filter(f => f.trim());
     for (const file of files) {
-      changedFiles.add(file.filename);
+      changedFiles.add(file);
     }
   } catch (error) {
     core.warning(`Failed to get changed files: ${error.message}`);
@@ -30134,55 +30133,56 @@ async function generateSummary(results) {
 
   markdown += '\n';
 
-  // Breakdown by severity
-  if (Object.keys(summary.byCheckType).length > 0) {
-    markdown += '## Findings by Severity\n\n';
-    markdown += '| Severity | Passed | Failed | Skipped |\n';
-    markdown += '|----------|--------|--------|----------|\n';
-
-    const severities = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'];
-    for (const severity of severities) {
-      if (summary.byCheckType[severity]) {
-        const { passed, failed, skipped } = summary.byCheckType[severity];
-        const icon = getSeverityIcon(severity);
-        markdown += `| ${icon} ${severity} | ${passed} | ${failed} | ${skipped} |\n`;
-      }
-    }
-    markdown += '\n';
-  }
-
   // Failed checks details
   const failedChecks = allResults.filter(r => r.checkType === 'failed');
   if (failedChecks.length > 0) {
-    markdown += '## Failed Checks\n\n';
+    markdown += '## Failed Checks by Type\n\n';
 
-    // Group by severity
-    const groupedBySeverity = groupBy(failedChecks, 'severity');
+    // Group by check ID and count occurrences
+    const groupedByCheckId = groupBy(failedChecks, 'checkId');
+    const checkCounts = Object.entries(groupedByCheckId)
+      .map(([checkId, checks]) => ({
+        checkId,
+        checkName: checks[0].checkName,
+        count: checks.length,
+        checks
+      }))
+      .sort((a, b) => b.count - a.count);
 
-    for (const [severity, checks] of Object.entries(groupedBySeverity)) {
-      const icon = getSeverityIcon(severity);
-      markdown += `### ${icon} ${severity} Severity\n\n`;
+    // Show summary table
+    markdown += '| Check | Count |\n';
+    markdown += '|-------|-------|\n';
+    for (const { checkId, checkName, count } of checkCounts) {
+      markdown += `| ${checkName} (${checkId}) | ${count} |\n`;
+    }
+    markdown += '\n';
 
-      for (const check of checks.slice(0, 50)) { // Limit to avoid huge summaries
+    // Show details for each check type
+    markdown += '## Failed Check Details\n\n';
+    for (const { checkId, checkName, checks } of checkCounts) {
+      markdown += `### ${checkName} (${checkId})\n\n`;
+
+      if (checks[0].guideline) {
+        markdown += `[View Guideline](${checks[0].guideline})\n\n`;
+      }
+
+      for (const check of checks.slice(0, 10)) { // Limit to 10 per check type
         const lineInfo = check.line.length > 0
           ? `:${check.line[0]}-${check.line[1]}`
           : '';
         const fileLink = check.file ? `[\`${check.file}${lineInfo}\`](${check.file})` : 'Unknown file';
 
-        markdown += `- **${check.checkName}** (${check.checkId})\n`;
-        markdown += `  - File: ${fileLink}\n`;
+        markdown += `- ${fileLink}`;
         if (check.resource) {
-          markdown += `  - Resource: \`${check.resource}\`\n`;
-        }
-        if (check.guideline) {
-          markdown += `  - [View Guideline](${check.guideline})\n`;
+          markdown += ` - \`${check.resource}\``;
         }
         markdown += '\n';
       }
 
-      if (checks.length > 50) {
-        markdown += `\n_... and ${checks.length - 50} more ${severity} severity issues_\n\n`;
+      if (checks.length > 10) {
+        markdown += `\n_... and ${checks.length - 10} more instances_\n`;
       }
+      markdown += '\n';
     }
   }
 
@@ -30190,17 +30190,6 @@ async function generateSummary(results) {
   await core.summary
     .addRaw(markdown)
     .write();
-}
-
-function getSeverityIcon(severity) {
-  const icons = {
-    'CRITICAL': '🔴',
-    'HIGH': '🟠',
-    'MEDIUM': '🟡',
-    'LOW': '🔵',
-    'UNKNOWN': '⚪'
-  };
-  return icons[severity] || '⚪';
 }
 
 function groupBy(array, key) {
