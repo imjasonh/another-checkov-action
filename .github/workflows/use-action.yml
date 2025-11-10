@@ -27,5 +27,3 @@ jobs:
       - uses: ./
         with:
           fail-on-error: false
-          checkov-flags: |
-            -c CRITICAL
