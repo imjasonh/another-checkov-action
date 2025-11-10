@@ -32199,7 +32199,6 @@ async function runCheckov(directory, framework, outputFile) {
   const args = [
     '--directory', directory,
     '--output', 'json',
-    '--output-file-path', path.dirname(outputFile),
     '--soft-fail'  // Always use soft-fail to capture results; we'll handle failure in the action
   ];
 
@@ -32208,12 +32207,16 @@ async function runCheckov(directory, framework, outputFile) {
   }
 
   let exitCode = 0;
+  let outputData = '';
+
   try {
-    await exec.exec('checkov', args, {
+    exitCode = await exec.exec('checkov', args, {
       ignoreReturnCode: true,
       listeners: {
         stdout: (data) => {
-          core.debug(data.toString());
+          const text = data.toString();
+          outputData += text;
+          core.debug(text);
         },
         stderr: (data) => {
           core.debug(data.toString());
@@ -32223,6 +32226,11 @@ async function runCheckov(directory, framework, outputFile) {
   } catch (error) {
     // Checkov returns non-zero when findings are present
     exitCode = error.exitCode || 1;
+  }
+
+  // Write captured output to file
+  if (outputData) {
+    fs.writeFileSync(outputFile, outputData);
   }
 
   return exitCode;
