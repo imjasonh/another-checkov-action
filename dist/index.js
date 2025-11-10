@@ -32287,11 +32287,21 @@ async function runCheckov(outputFile, checkovFlags) {
     }
   }
 
+  // Add --directory . if not already specified
+  const hasDirectory = userFlags.some(f => f.startsWith('--directory') || f === '-d');
+  const hasFile = userFlags.some(f => f.startsWith('--file') || f === '-f');
+
   const args = [
     '--output', 'json',
     '--soft-fail',  // Always use soft-fail to capture results; we'll handle failure in the action
-    ...userFlags
   ];
+
+  // Default to current directory if neither --directory nor --file specified
+  if (!hasDirectory && !hasFile) {
+    args.push('--directory', '.');
+  }
+
+  args.push(...userFlags);
 
   let exitCode = 0;
   let outputData = '';
