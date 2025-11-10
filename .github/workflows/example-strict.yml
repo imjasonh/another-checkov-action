@@ -1,4 +1,4 @@
-name: Checkov Strict Mode (Example)
+name: Checkov Security Scan
 
 # This workflow demonstrates stricter security scanning
 # Uncomment and modify as needed for production use
@@ -8,10 +8,6 @@ on:
     branches: [main]
     paths:
       - '**.tf'
-      - '**.yaml'
-      - '**.yml'
-      - 'Dockerfile'
-      - '**.json'
 
 permissions:
   contents: read
@@ -21,14 +17,11 @@ permissions:
 jobs:
   checkov-strict:
     runs-on: ubuntu-latest
-    name: Strict Security Scan
+    name: Checkov Security Scan
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Checkov (Strict Mode)
-        uses: ./
+      - uses: actions/checkout@v4
+      - uses: ./
         with:
           directory: '.'
           framework: 'all'  # Scan all supported frameworks
