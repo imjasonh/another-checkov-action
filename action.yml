@@ -6,14 +6,6 @@ branding:
   color: 'blue'
 
 inputs:
-  directory:
-    description: 'Directory to scan (default: current directory)'
-    required: false
-    default: '.'
-  framework:
-    description: 'Filter scan to specific frameworks (e.g., terraform, kubernetes, dockerfile)'
-    required: false
-    default: 'all'
   fail-on-error:
     description: 'Fail the action if security issues are found'
     required: false
@@ -22,14 +14,10 @@ inputs:
     description: 'Version of checkov to install (default: latest)'
     required: false
     default: 'latest'
-  config-file:
-    description: 'Path to Checkov config file (default: .checkov.yaml if it exists)'
+  checkov-flags:
+    description: 'Flags to pass to checkov (e.g., "--directory . --framework terraform --skip-check CKV_AWS_1")'
     required: false
     default: ''
-  output-format:
-    description: 'Output format for checkov (default: json)'
-    required: false
-    default: 'json'
 
 outputs:
   results:
